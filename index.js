@@ -1,5 +1,5 @@
 (() => {
-    console.log("[AutoHideKeyboard] Loaded (fixed Android version)");
+    console.log("[AutoHideKeyboard] Loaded (force-unfocus method)");
 
     const EXT_ID = "auto_hide_keyboard";
 
@@ -12,29 +12,33 @@
         return window.extension_settings?.[EXT_ID]?.enabled !== false;
     }
 
-    function forceBlur() {
+    function hideKeyboardStrong() {
+        if (!isEnabled()) return;
+
         const el = getInput();
         if (!el) return;
 
+        // Save state
+        const wasFocused = document.activeElement === el;
+
+        // 🧨 KEY TRICK: break Android keyboard binding
+        el.setAttribute("readonly", "true");
         el.blur();
         document.activeElement?.blur();
 
-        // Critical: Android Chrome re-focus happens AFTER tick
-        requestAnimationFrame(() => {
-            el.blur();
-            document.activeElement?.blur();
-        });
-
+        // Force layout update cycle
         setTimeout(() => {
             el.blur();
             document.activeElement?.blur();
-        }, 150);
-    }
 
-    function hideKeyboard() {
-        if (!isEnabled()) return;
+            // restore input usability
+            el.removeAttribute("readonly");
 
-        forceBlur();
+            // optional: do NOT refocus automatically
+            if (wasFocused) {
+                // keep it unfocused so keyboard stays closed
+            }
+        }, 200);
     }
 
     function initSettings() {
@@ -81,7 +85,7 @@
 
         window.eventSource.on(
             window.event_types.MESSAGE_SENT,
-            () => setTimeout(hideKeyboard, 0)
+            () => setTimeout(hideKeyboardStrong, 0)
         );
 
         console.log("[AutoHideKeyboard] Hooked MESSAGE_SENT");
