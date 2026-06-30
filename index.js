@@ -1,5 +1,5 @@
 (() => {
-    console.log("[AutoHideKeyboard] Loaded (force-unfocus method)");
+    console.log("[AutoHideKeyboard] Loaded (DOM listener version)");
 
     const EXT_ID = "auto_hide_keyboard";
 
@@ -12,33 +12,21 @@
         return window.extension_settings?.[EXT_ID]?.enabled !== false;
     }
 
-    function hideKeyboardStrong() {
+    function hideKeyboard() {
         if (!isEnabled()) return;
 
         const el = getInput();
         if (!el) return;
 
-        // Save state
-        const wasFocused = document.activeElement === el;
-
-        // 🧨 KEY TRICK: break Android keyboard binding
-        el.setAttribute("readonly", "true");
+        // blur immediately
         el.blur();
         document.activeElement?.blur();
 
-        // Force layout update cycle
+        // Android safety re-blur after DOM settles
         setTimeout(() => {
             el.blur();
             document.activeElement?.blur();
-
-            // restore input usability
-            el.removeAttribute("readonly");
-
-            // optional: do NOT refocus automatically
-            if (wasFocused) {
-                // keep it unfocused so keyboard stays closed
-            }
-        }, 200);
+        }, 80);
     }
 
     function initSettings() {
@@ -77,24 +65,25 @@
         });
     }
 
-    function waitForST() {
-        if (!window.eventSource || !window.event_types) {
-            setTimeout(waitForST, 100);
-            return;
-        }
+    function attachListeners() {
+        // Send button (primary reliable trigger)
+        document.addEventListener("click", (e) => {
+            if (!e.target.closest("#send_but")) return;
+            setTimeout(hideKeyboard, 0);
+        });
 
-        window.eventSource.on(
-            window.event_types.MESSAGE_SENT,
-            () => setTimeout(hideKeyboardStrong, 0)
-        );
-
-        console.log("[AutoHideKeyboard] Hooked MESSAGE_SENT");
+        // Fallback: Enter key (ST default send)
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                setTimeout(hideKeyboard, 0);
+            }
+        });
     }
 
     function init() {
         initSettings();
         addSettingsUI();
-        waitForST();
+        attachListeners();
     }
 
     init();
