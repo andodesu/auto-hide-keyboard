@@ -1,45 +1,29 @@
 (() => {
-    console.log("[AutoHideKeyboard] Zero-delay loaded");
-
-    const getInput = () =>
-        document.querySelector("#send_textarea") ||
-        document.querySelector("textarea");
-
-    let lastMessageCount = 0;
+    console.log("[AutoHideKeyboard] Loaded");
 
     function hideKeyboard() {
-        const el = getInput();
+        const el =
+            document.querySelector("#send_textarea") ||
+            document.querySelector("textarea");
+
         if (!el) return;
 
         el.blur();
-        document.activeElement?.blur?.();
 
-        // small safety pass for Android Chrome
         setTimeout(() => {
-            el.blur();
-        }, 50);
+            document.activeElement?.blur?.();
+        }, 30);
     }
 
-    function checkForNewMessage() {
-        const messages = document.querySelectorAll(".mes");
+    document.addEventListener("click", (e) => {
+        const sendButton = e.target.closest("#send_but");
+        if (!sendButton) return;
 
-        if (messages.length === lastMessageCount) return;
-
-        lastMessageCount = messages.length;
-
-        // only trigger when message count increases
-        hideKeyboard();
-    }
-
-    // Watch DOM changes (this is the key improvement)
-    const observer = new MutationObserver(() => {
-        checkForNewMessage();
+        // sync with browser paint cycle instead of interrupting it
+        requestAnimationFrame(() => {
+            hideKeyboard();
+        });
     });
 
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-
-    console.log("[AutoHideKeyboard] observing chat for new messages");
+    console.log("[AutoHideKeyboard] optimized version loaded");
 })();
