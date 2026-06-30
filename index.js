@@ -1,29 +1,45 @@
 (() => {
-    console.log("[AutoHideKeyboard] Loaded");
+    console.log("[AutoHideKeyboard] Zero-delay loaded");
+
+    const getInput = () =>
+        document.querySelector("#send_textarea") ||
+        document.querySelector("textarea");
+
+    let lastMessageCount = 0;
 
     function hideKeyboard() {
-        const el =
-            document.querySelector("#send_textarea") ||
-            document.querySelector("textarea");
-
+        const el = getInput();
         if (!el) return;
 
-        // blur input to trigger Android keyboard dismissal
         el.blur();
+        document.activeElement?.blur?.();
 
-        // extra safety for Chrome/Samsung Internet
+        // small safety pass for Android Chrome
         setTimeout(() => {
-            document.activeElement?.blur?.();
+            el.blur();
         }, 50);
     }
 
-    document.addEventListener("click", (e) => {
-        const sendButton = e.target.closest("#send_but");
-        if (!sendButton) return;
+    function checkForNewMessage() {
+        const messages = document.querySelectorAll(".mes");
 
-        // wait until SillyTavern processes send
-        setTimeout(hideKeyboard, 0);
+        if (messages.length === lastMessageCount) return;
+
+        lastMessageCount = messages.length;
+
+        // only trigger when message count increases
+        hideKeyboard();
+    }
+
+    // Watch DOM changes (this is the key improvement)
+    const observer = new MutationObserver(() => {
+        checkForNewMessage();
     });
 
-    console.log("[AutoHideKeyboard] Send-only hook active");
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    console.log("[AutoHideKeyboard] observing chat for new messages");
 })();
