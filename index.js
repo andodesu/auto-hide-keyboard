@@ -1,5 +1,7 @@
+import { eventSource, event_types } from "../../../script.js";
+
 (() => {
-    console.log("[AutoHideKeyboard] Loaded");
+    console.log("[AutoHideKeyboard] Loaded (event-only)");
 
     const getInput = () =>
         document.querySelector("#send_textarea") ||
@@ -13,29 +15,26 @@
 
         blockFocus = true;
 
+        // Primary blur
         el.blur();
         document.activeElement?.blur();
 
+        // Android Chrome safety re-blur
+        setTimeout(() => {
+            el.blur();
+            document.activeElement?.blur();
+        }, 100);
+
+        // release focus lock
         setTimeout(() => {
             blockFocus = false;
-        }, 600);
+        }, 500);
     }
 
-    // Send button click
-    document.addEventListener("click", (e) => {
-        if (e.target.closest("#send_but")) {
-            setTimeout(hideKeyboard, 0);
-        }
-    });
+    // ✅ ONLY trigger point: actual ST send completion
+    eventSource.on(event_types.MESSAGE_SENT, hideKeyboard);
 
-    // Enter key send
-    document.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            setTimeout(hideKeyboard, 0);
-        }
-    });
-
-    // Prevent Android Chrome from instantly refocusing textarea
+    // Prevent Android Chrome from immediately stealing focus back
     document.addEventListener("focusin", (e) => {
         if (!blockFocus) return;
         if (e.target?.tagName === "TEXTAREA") {
