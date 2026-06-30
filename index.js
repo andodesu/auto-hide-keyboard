@@ -1,11 +1,40 @@
 (() => {
-    console.log("[AutoHideKeyboard] Loading...");
+    console.log("[AutoHideKeyboard] Loaded (fixed Android version)");
 
     const EXT_ID = "auto_hide_keyboard";
 
     function getInput() {
         return document.querySelector("#send_textarea") ||
                document.querySelector("textarea");
+    }
+
+    function isEnabled() {
+        return window.extension_settings?.[EXT_ID]?.enabled !== false;
+    }
+
+    function forceBlur() {
+        const el = getInput();
+        if (!el) return;
+
+        el.blur();
+        document.activeElement?.blur();
+
+        // Critical: Android Chrome re-focus happens AFTER tick
+        requestAnimationFrame(() => {
+            el.blur();
+            document.activeElement?.blur();
+        });
+
+        setTimeout(() => {
+            el.blur();
+            document.activeElement?.blur();
+        }, 150);
+    }
+
+    function hideKeyboard() {
+        if (!isEnabled()) return;
+
+        forceBlur();
     }
 
     function initSettings() {
@@ -16,6 +45,9 @@
     }
 
     function addSettingsUI() {
+        const target = document.querySelector("#extensions_settings");
+        if (!target) return;
+
         const container = document.createElement("div");
         container.className = "inline-drawer";
 
@@ -31,9 +63,6 @@
             </div>
         `;
 
-        const target = document.querySelector("#extensions_settings");
-        if (!target) return;
-
         target.appendChild(container);
 
         const checkbox = container.querySelector("#ahk_toggle");
@@ -44,62 +73,24 @@
         });
     }
 
-    function initEvents() {
-        let blockFocus = false;
-
-        function hideKeyboard() {
-            if (!window.extension_settings[EXT_ID].enabled) return;
-
-            const el = getInput();
-            if (!el) return;
-
-            blockFocus = true;
-
-            el.blur();
-            document.activeElement?.blur();
-
-            setTimeout(() => {
-                el.blur();
-                document.activeElement?.blur();
-            }, 100);
-
-            setTimeout(() => {
-                blockFocus = false;
-            }, 500);
+    function waitForST() {
+        if (!window.eventSource || !window.event_types) {
+            setTimeout(waitForST, 100);
+            return;
         }
 
-        // Wait for ST globals safely
-        const wait = () => {
-            if (!window.eventSource || !window.event_types) {
-                setTimeout(wait, 100);
-                return;
-            }
+        window.eventSource.on(
+            window.event_types.MESSAGE_SENT,
+            () => setTimeout(hideKeyboard, 0)
+        );
 
-            window.eventSource.on(
-                window.event_types.MESSAGE_SENT,
-                hideKeyboard
-            );
-
-            console.log("[AutoHideKeyboard] Hooked MESSAGE_SENT");
-        };
-
-        wait();
-
-        // Prevent Android Chrome re-focus loop
-        document.addEventListener("focusin", (e) => {
-            if (!blockFocus) return;
-            if (e.target?.tagName === "TEXTAREA") {
-                e.target.blur();
-            }
-        });
+        console.log("[AutoHideKeyboard] Hooked MESSAGE_SENT");
     }
 
     function init() {
         initSettings();
         addSettingsUI();
-        initEvents();
-
-        console.log("[AutoHideKeyboard] Ready");
+        waitForST();
     }
 
     init();
